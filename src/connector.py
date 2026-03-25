@@ -2,6 +2,12 @@ import os
 import requests
 import pandas as pd
 from dotenv import load_dotenv
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -19,6 +25,7 @@ class EIAConnector:
         self.base_url = "https://api.eia.gov/v2/nuclear-outages/us-nuclear-outages/data/"
 
         if not self.api_key:
+            logger.error("Critical: EIA_API_KEY not found in .env file.")
             raise ValueError("Missing API Key. Please check the .env file.")
 
     def fetch_nuclear_outages(self):
