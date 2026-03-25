@@ -1,6 +1,7 @@
 import os
 import requests
 import pandas as pd
+import logging
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -28,6 +29,15 @@ class EIAConnector:
             logger.error("Critical: EIA_API_KEY not found in .env file.")
             raise ValueError("Missing API Key. Please check the .env file.")
 
+        self.session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504]
+        )
+        self.session.mount("https://", HTTPAdapter(max_retries=retry_strategy))
+
+        
     def fetch_nuclear_outages(self):
         """
         Queries the EIA API for the latest nuclear plant outage data.
@@ -35,33 +45,56 @@ class EIAConnector:
            pd.DataFrame: Cleaned DataFrame containing outage events.
            or None if the request failed.
         """
-        params = {
-            "api_key":self.api_key,
-            "frequency" : "daily",
-            "data[0]":"capacity",
-            "data[1]":"outage",
-            "data[2]":"percentOutage",
-            "sort[0][column]":"period",
-            "sort[0][direction]":"desc",
-            "offset":0,
-            "length":5000
-        }
+        all_data = []
+        offset = 0
+        limit = 5000
+        required_fields = ["period", "outage", "capacity"]
+        logger.info("Starting data extraction from EIA...")
+        while True:
+            
+            params = {
+                "api_key":self.api_key,
+                "frequency" : "daily",
+                "data[0]":"capacity",
+                "data[1]":"outage",
+                "data[2]":"percentOutage",
+                "sort[0][column]":"period",
+                "sort[0][direction]":"desc",
+                "offset":offset,
+                "length":limit
+            }
 
-        try:
-            print("Connecting to EIA Open Data API...")
-            response = requests.get(self.base_url, params=params)
-            response.raise_for_status()
-            json_data = response.json()
-            raw_data = json_data['response']['data']
-            return pd.DataFrame(raw_data)
+            try:
+                response = self.session.get(self.base_url, params=params, timeout=20)
+                response.raise_for_status()
+                data_batch = response.json()['response']['data']
+                if not data_batch:
+                    break
+                all_data.extend(data_batch)
+                logger.info(f"Fetched {len(all_data)} records so far (offset: {offset})...")
 
-        except Exception as e:
-            print(f"Connection error: {e}")
-            return None
+                if len(data_batch) < limit:
+                    break
 
+                offset += limit
+
+            except Exception as e:
+                logger.error(f"Graceful shutdown: Error during fetch at offset {offset}: {e}")
+                break
+
+        df = pd.DataFrame(all_data)
+
+        if not df.empty:
+            missing = [field for field in required_fields if field not in df.columns]
+            if missing:
+                logger.warning(f"Validation failed: missing fields {missing}")
+                return None
+            return df
+        return None
+    
     def save_to_parquet(self, df, filename="../data/us_nuclear_outages.parquet"):
         """
-        Exports the DF to a compressed parquet file.
+        Exports the DF to a compressed parquet file, using pyarrow.
         Args:
            df (pd.Dataframe): The data to be stored
            filename(str): Target path for the .parquet file.
@@ -70,19 +103,16 @@ class EIAConnector:
             try:
                 os.makedirs(os.path.dirname(filename), exist_ok=True)
                 df.to_parquet(filename, engine='pyarrow', compression='snappy', index=False)
-                print(f"Success: Dataset saved at {filename}")
-                print(f"Total records: {len(df)}")
+                logger.info(f"Success: data exported to {filename}")
             except Exception as e:
-                print(f"Error saving Parquet: {e}")
+                logger.error(f"Failed to save Parquet file: {e}")
         else:
-            print("No data available to save.")
+            logger.warning("No valid data to save.")
                 
-
 if __name__ == "__main__":
-    connector = EIAConnector()
-    outages_df = connector.fetch_nuclear_outages()
-    connector.save_to_parquet(outages_df)
-    if outages_df is not None:
-        print(f"Retrieved {len(outages_df)} records.")
-    else:
-        print("Failed to retrieve data. Check the API key connection.")
+    try:
+        connector = EIAConnector()
+        raw_df = connector.fetch_nuclear_outages()
+        connector.save_to_parquet(raw_df)
+    except Exception as e:
+        logger.error(f"Process failed: {e}")
