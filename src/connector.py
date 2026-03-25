@@ -52,11 +52,29 @@ class EIAConnector:
             print(f"Connection error: {e}")
             return None
 
+    def save_to_parquet(self, df, filename="data/us_nuclear_outages.parquet"):
+        """
+        Exports the DF to a compressed parquet file.
+        Args:
+           df (pd.Dataframe): The data to be stored
+           filename(str): Target path for the .parquet file.
+        """
+        if df is not None and not df.empty:
+            try:
+                os.makedirs(os.path.dirname(filename), exist_ok=True)
+                df.to_parquet(filename, engine='pyarrow', compression='snappy', index=False)
+                print(f"Success: Dataset saved at {filename}")
+                print(f"Total records: {len(df)}")
+            except Exception as e:
+                print(f"Error saving Parquet: {e}")
+        else:
+            print("No data available to save.")
+                
 
 if __name__ == "__main__":
     connector = EIAConnector()
-
     outages_df = connector.fetch_nuclear_outages()
+    connector.save_to_parquet(outages_df)
     if outages_df is not None:
         print(f"Retrieved {len(outages_df)} records.")
     else:
