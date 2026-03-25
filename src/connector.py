@@ -52,7 +52,7 @@ class EIAConnector:
             print(f"Connection error: {e}")
             return None
 
-    def save_to_parquet(self, df, filename="data/us_nuclear_outages.parquet"):
+    def save_to_parquet(self, df, filename="../data/us_nuclear_outages.parquet"):
         """
         Exports the DF to a compressed parquet file.
         Args:
