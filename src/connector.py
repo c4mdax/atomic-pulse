@@ -16,7 +16,7 @@ class EIAConnector:
         Initializes the connector using the EIA_API_KEY from env variables.
         """
         self.api_key = os.getenv("EIA_API_KEY")
-        self.base_url = "https://api.eia.gov/v2/nuclear/outages/data/"
+        self.base_url = "https://api.eia.gov/v2/nuclear-outages/us-nuclear-outages/data/"
 
         if not self.api_key:
             raise ValueError("Missing API Key. Please check the .env file.")
@@ -30,8 +30,10 @@ class EIAConnector:
         """
         params = {
             "api_key":self.api_key,
-            "data[]":["outage_capacity", "capacity"],
-            "frequency":"daily",
+            "frequency" : "daily",
+            "data[0]":"capacity",
+            "data[1]":"outage",
+            "data[2]":"percentOutage",
             "sort[0][column]":"period",
             "sort[0][direction]":"desc",
             "offset":0,
@@ -49,3 +51,13 @@ class EIAConnector:
         except Exception as e:
             print(f"Connection error: {e}")
             return None
+
+
+if __name__ == "__main__":
+    connector = EIAConnector()
+
+    outages_df = connector.fetch_nuclear_outages()
+    if outages_df is not None:
+        print(f"Retrieved {len(outages_df)} records.")
+    else:
+        print("Failed to retrieve data. Check the API key connection.")
