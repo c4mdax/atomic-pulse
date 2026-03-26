@@ -15,7 +15,14 @@ def get_db_connection():
 def read_root():
     return {"status":"¡Nuclear Outages API is Online!", "version":"1.0.0"}
 
+@app.get("/outages", response_model=List[OutageRead])
 def get_all_outages(limit: int = 100):
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            query = "SELECT * FROM fct_nuclear_outages LIMIT ?"
+            rows = cursor.execute(query, (limit,)).fetchall()
+            return [dict(row) for row in rows]
 
 def get_outage_summary():
     
