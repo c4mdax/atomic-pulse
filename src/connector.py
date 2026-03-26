@@ -38,6 +38,25 @@ class EIAConnector:
         self.session.mount("https://", HTTPAdapter(max_retries=retry_strategy))
 
         
+    def get_latest_date(self):
+        """
+        Reads the existing parquet file to find the most recent extraction date.
+        Returns a string 'YYYY-MM-DD' or None if full load is required.
+        """
+        if os.path.exists(self.file_path):
+            try:
+                df_existing = pd.read_parquet(self.file_path, columns=["period"])
+                if not df_existing.empty:
+                    max_date = pd.to_datetime(df_existing['period']).max()
+                    next_day = max_date + pd.Timedelta(days=1)
+                    start_date_str = next_day.strftime('%Y-%m-%d')
+                    logger.info(f"Existing data found. Fetching incrementally starting from: {start_date_str}")
+                    return start_date_str
+            except Exception as e:
+                logger.warning(f"Could not read existing Parquet file. Defaulting to full load. Error: {e}")
+        logger.info("No existing data found. Performing full historical extraction")
+        return None
+        
     def fetch_nuclear_outages(self):
         """
         Queries the EIA API for the latest nuclear plant outage data.
@@ -49,9 +68,9 @@ class EIAConnector:
         offset = 0
         limit = 5000
         required_fields = ["period", "outage", "capacity"]
+
         logger.info("Starting data extraction from EIA...")
-        while True:
-            
+        while True:    
             params = {
                 "api_key":self.api_key,
                 "frequency" : "daily",
@@ -64,10 +83,13 @@ class EIAConnector:
                 "length":limit
             }
 
+            if start_date:
+                params["start"] = start_date
+
             try:
                 response = self.session.get(self.base_url, params=params, timeout=20)
                 response.raise_for_status()
-                data_batch = response.json()['response']['data']
+                data_batch = response.json().get('response', {}).get('data', [])
                 if not data_batch:
                     break
                 all_data.extend(data_batch)
@@ -81,6 +103,9 @@ class EIAConnector:
             except Exception as e:
                 logger.error(f"Graceful shutdown: Error during fetch at offset {offset}: {e}")
                 break
+        if not all_data:
+            logger.info("No new data from the API. System is up to date.")
+            return pd.DataFrame()
 
         df = pd.DataFrame(all_data)
 
