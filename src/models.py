@@ -8,7 +8,7 @@ class OutageRead(BaseModel):
     id: int
     date_key: str
     status_id: int
-    capacity_mw: flo at
+    capacity_mw: float
     outage_mw: float
     percent_outage: float
 
