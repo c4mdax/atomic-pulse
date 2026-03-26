@@ -85,7 +85,7 @@ class DatabaseBuilder:
             #foreign keys on
             cursor.execute("PRAGMA foreign_keys = ON;")
             # delete old boards
-            cursor.execute("DROP TABLE IF EXISTS fct_nuclera_outages")
+            cursor.execute("DROP TABLE IF EXISTS fct_nuclear_outages")
             cursor.execute("DROP TABLE IF EXISTS dim_status_thresholds")
             cursor.execute("DROP TABLE IF EXISTS dim_date")
             # dim_status_thresholds
@@ -97,6 +97,32 @@ class DatabaseBuilder:
                     max_percent REAL
                 )
             """)
+
+            cursor.execute("""
+                CREATE TABLE dim_date (
+                    date_key TEXT PRIMARY KEY,
+                    day_name TEXT
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE fct_nuclear_outages (
+                    id INTEGER PRIMARY KEY,
+                    date_key TEXT,
+                    status_id INTEGER,
+                    capacity_mw REAL,
+                    outage_mw REAL,
+                    percent_outage REAL,
+                    FOREIGN KEY (date_key) REFERENCES dim_date (date_key),
+                    FOREIGN KEY (status_id) REFERENCES dim_status_thresholds (status_id)
+                )
+            """)
+
+            dim_status.to_sql('dim_status_thresholds', conn, if_exists='append', index=False)
+            dim_date.to_sql('dim_date', conn, if_exists='append', index=False)
+            fct_outages.to_sql('fct_nuclear_outages', conn, if_exists='append', index=False)
+
+
 if __name__ == "__main__":
     try:
         builder = DatabaseBuilder()
