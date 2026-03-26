@@ -5,11 +5,12 @@ from src.models import OutageRead, OutageSummary
 import os
 
 app = FastAPI(title="Nuclear Outages API", description="Nuclear Outages Data Access Layer")
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "..", "data", "nuclear_outages.db")
-
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, "data", "nuclear_outages.db")
 def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
+    if not os.path.exists(DB_PATH):
+        raise FileNotFoundError(f"DB not found in: {DB_PATH}")
+    conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row #access rows by name
     return conn
 
