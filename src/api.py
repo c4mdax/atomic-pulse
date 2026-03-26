@@ -44,6 +44,6 @@ def get_outage_summary():
                 "avg_outage_mw": round(row["avg_outage"], 2),
                 "max_outage_mw": row["max_outage"]
             }
-    except Exceptioin as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
