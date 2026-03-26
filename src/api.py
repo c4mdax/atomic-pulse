@@ -2,9 +2,11 @@ import sqlite3
 from fastapi import FastAPI, HTTPException
 from typing import List
 from src.models import OutageRead, OutageSummary
+import os
 
 app = FastAPI(title="Nuclear Outages API", description="Nuclear Outages Data Access Layer")
-DB_PATH = "data/nuclear_outages.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "..", "data", "nuclear_outages.db")
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
