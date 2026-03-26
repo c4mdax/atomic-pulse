@@ -24,7 +24,7 @@ class EIAConnector:
         """
         self.api_key = os.getenv("EIA_API_KEY")
         self.base_url = "https://api.eia.gov/v2/nuclear-outages/us-nuclear-outages/data/"
-
+        self.file_path = "data/us_nuclear_outages.parquet"
         if not self.api_key:
             logger.error("Critical: EIA_API_KEY not found in .env file.")
             raise ValueError("Missing API Key. Please check the .env file.")
@@ -57,7 +57,7 @@ class EIAConnector:
         logger.info("No existing data found. Performing full historical extraction")
         return None
         
-    def fetch_nuclear_outages(self):
+    def fetch_nuclear_outages(self, start_date=None):
         """
         Queries the EIA API for the latest nuclear plant outage data.
         Returns:
@@ -117,27 +117,38 @@ class EIAConnector:
             return df
         return None
     
-    def save_to_parquet(self, df, filename="data/us_nuclear_outages.parquet"):
+    def save_to_parquet(self, df_new):
         """
         Exports the DF to a compressed parquet file, using pyarrow.
         Args:
            df (pd.Dataframe): The data to be stored
            filename(str): Target path for the .parquet file.
         """
-        if df is not None and not df.empty:
-            try:
-                os.makedirs(os.path.dirname(filename), exist_ok=True)
-                df.to_parquet(filename, engine='pyarrow', compression='snappy', index=False)
-                logger.info(f"Success: data exported to {filename}")
-            except Exception as e:
-                logger.error(f"Failed to save Parquet file: {e}")
-        else:
-            logger.warning("No valid data to save.")
-                
+        if df_new is None or df_new.empty:
+            logger.info("No new data to save.")
+            return
+        try:
+            os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
+            if os.path.exists(self.file_path):
+                df_existing = pd.read_parquet(self.file_path)
+                df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+
+                df_combined.drop_duplicates(subset=['period'], keep='last', inplace=True)
+                df_combined.sort_values(by='period', ascending=False, inplace=True)
+
+                df_combined.to_parquet(self.file_path, engine='pyarrow', compression='snappy', index=False)
+                logger.info(f"Success: Appended {len(df_new)} new records.  Total records: {len(df_combined)}")
+            else:
+                df_new.to_parquet(self.file_path, engine='pyarrow', compression='snappy', index=False)
+                logger.info(f"Success: Initial data exported to {self.file_path} ({len(df_new)} records).")
+        except Exception as e:
+            logger.error(f"Failed to save Parquet file: {e}")
+
 if __name__ == "__main__":
     try:
         connector = EIAConnector()
-        raw_df = connector.fetch_nuclear_outages()
+        last_date = connector.get_latest_date()
+        raw_df = connector.fetch_nuclear_outages(start_date = last_date)
         connector.save_to_parquet(raw_df)
     except Exception as e:
         logger.error(f"Process failed: {e}")
