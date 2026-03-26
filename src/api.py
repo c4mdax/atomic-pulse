@@ -42,6 +42,9 @@ def get_outage_summary():
                 FROM fct_nuclear_outages
             """
             row = cursor.execute(query).fetchone()
+            agv_val = row["avg_outage"] if row["avg_outage"] is not None else 0.0
+            max_val = row["max_outage"] if row["max_outage"] is not None else 0.0
+            
             if not row or row["total_records"] == 0:
                 return {"total_records":0, "avg_outage_mw": 0.0, "max_outage_mw":0.0}
             
@@ -51,6 +54,5 @@ def get_outage_summary():
                 "max_outage_mw": row["max_outage"]
             }
     except Exception as e:
-        print()
         raise HTTPException(status_code=500, detail=str(e))
     
