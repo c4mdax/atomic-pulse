@@ -23,6 +23,8 @@ def get_all_outages(limit: int = 100):
             query = "SELECT * FROM fct_nuclear_outages LIMIT ?"
             rows = cursor.execute(query, (limit,)).fetchall()
             return [dict(row) for row in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 def get_outage_summary():
     
