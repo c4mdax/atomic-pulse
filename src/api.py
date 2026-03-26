@@ -7,6 +7,9 @@ app = FastAPI(title="Nuclear Outages API", description="Nuclear Outages Data Acc
 DB_PATH = "data/nuclear_outages.db"
 
 def get_db_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row #access rows by name
+    return conn
 
 def read_root():
 
