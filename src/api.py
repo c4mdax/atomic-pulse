@@ -11,7 +11,9 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row #access rows by name
     return conn
 
+@app.get("/")
 def read_root():
+    return {"status":"¡Nuclear Outages API is Online!", "version":"1.0.0"}
 
 def get_all_outages(limit: int = 100):
 
