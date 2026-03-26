@@ -6,7 +6,7 @@ from src.connector import EIAConnector
 """
 Purpose: Follow TDD Standards
 """
-def test_connector_initialization_error():
+def test_connector_initialization_error(monkeypatch):
     """
     Test if the connector  fails if there's no key
     """
@@ -14,7 +14,7 @@ def test_connector_initialization_error():
     with pytest.raises(ValueError):
         EIAConnector()
 
-def test_save_to_parquet_creates_file(tmp_path):
+def test_save_to_parquet_creates_file(tmp_path, monkeypatch):
     """
     Test if the connector create the us_nuclear_outages.parquet file and the data/ folder
     """
