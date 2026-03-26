@@ -13,7 +13,6 @@ class DatabaseBuilder:
     def build_database(self):
         """
         Transforms the flat Parquet file into a Star Schema and saves it to SQLite
-        Note: I chose the Star Schema architecture because of this project's compatibility with DataWarehouse.
         """
         if not os.path.exists(self.parquet_path):
             logger.error(f"Source file not found: {self.parquet_path}. Run connector.py first")
