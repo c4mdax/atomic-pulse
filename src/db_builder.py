@@ -78,7 +78,7 @@ class DatabaseBuilder:
         #     dim_status.to_sql('dim_status_thresholds', conn, if_exists='replace', index=False)
         #     dim_date.to_sql('dim_date', conn, if_exists='replace', index=False)
         #     fct_outages.to_sql('fct_nuclear_outages', conn, if_exists='replace', index=False)
-        # logger.info("Database successfully built and ready for the API")
+        
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -121,7 +121,7 @@ class DatabaseBuilder:
             dim_status.to_sql('dim_status_thresholds', conn, if_exists='append', index=False)
             dim_date.to_sql('dim_date', conn, if_exists='append', index=False)
             fct_outages.to_sql('fct_nuclear_outages', conn, if_exists='append', index=False)
-
+            logger.info("Database successfully built and ready for the API")
 
 if __name__ == "__main__":
     try:
