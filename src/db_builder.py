@@ -69,17 +69,34 @@ class DatabaseBuilder:
         """
         Saving in SQLite
         """
-        logger.info(f"Saving Star Schema to SQLite database at {self.db_path}...")
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        # logger.info(f"Saving Star Schema to SQLite database at {self.db_path}...")
+        # os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
-        # Context manager to close connection
+        # # Context manager to close connection
+        # with sqlite3.connect(self.db_path) as conn:
+        # #if_exists='replace' 
+        #     dim_status.to_sql('dim_status_thresholds', conn, if_exists='replace', index=False)
+        #     dim_date.to_sql('dim_date', conn, if_exists='replace', index=False)
+        #     fct_outages.to_sql('fct_nuclear_outages', conn, if_exists='replace', index=False)
+        # logger.info("Database successfully built and ready for the API")
+
         with sqlite3.connect(self.db_path) as conn:
-        #if_exists='replace' 
-            dim_status.to_sql('dim_status_thresholds', conn, if_exists='replace', index=False)
-            dim_date.to_sql('dim_date', conn, if_exists='replace', index=False)
-            fct_outages.to_sql('fct_nuclear_outages', conn, if_exists='replace', index=False)
-        logger.info("Database successfully built and ready for the API")
-
+            cursor = conn.cursor()
+            #foreign keys on
+            cursor.execute("PRAGMA foreign_keys = ON;")
+            # delete old boards
+            cursor.execute("DROP TABLE IF EXISTS fct_nuclera_outages")
+            cursor.execute("DROP TABLE IF EXISTS dim_status_thresholds")
+            cursor.execute("DROP TABLE IF EXISTS dim_date")
+            # dim_status_thresholds
+            cursor.execute("""
+                CREATE TABLE dim_status_thresholds (
+                    status_id INTEGER PRIMARY KEY,
+                    label TEXT,
+                    min_percent REAL,
+                    max_percent REAL
+                )
+            """)
 if __name__ == "__main__":
     try:
         builder = DatabaseBuilder()
