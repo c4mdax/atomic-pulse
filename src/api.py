@@ -1,8 +1,9 @@
 import sqlite3
-from fastapi import FastAPI, HTTPException, Query
-from typing import List
-from src.models import OutageRead, OutageSummary
 import os
+from fastapi import FastAPI, HTTPException, Query
+from typing import List, Optional
+from src.models import OutageRead, OutageSummary
+from src.connector import EIAConnector
 
 app = FastAPI(title="Nuclear Outages API", description="Nuclear Outages Data Access Layer")
 
@@ -48,7 +49,9 @@ def get_data(
 
 @app.post("/refresh")
 def refresh_data():
-    """Triggers the data pipeline: EIA API -> Parquet -> Database."""
+    """
+    Extracts new data from EIA API, appends to local parquet storagee and updates the SQLite database
+    """
     try:
         connector = EIAConnector()
         last_date = connector.get_latest_date()
@@ -56,12 +59,35 @@ def refresh_data():
         
         if raw_df is not None and not raw_df.empty:
             connector.save_to_parquet(raw_df)
+            with sqlite3.connect(DB_PATH) as conn:
+                raw_df.to_sql("fct_nuclear_outages", conn, if_exists="append", index=False)
+            
             return {
                 "status": "success", 
                 "message": "Data synchronized successfully", 
                 "records_processed": len(raw_df)
             }
         
-        return {"status": "success", "message": "No new data found", "records_processed": 0}
+        return {
+            "status": "success", 
+            "message": "No new data found. Database is up to date.", 
+            "records_processed": 0
+        }
+
     except Exception as e:
+        print(f"PIPELINE ERROR: {e}")
         raise HTTPException(status_code=500, detail=f"Pipeline failed: {str(e)}")
+    
+@app.get("/summary", response_model=OutageSummary)
+def get_summary():
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            row = cursor.execute("SELECT COUNT(*) as total, AVG(outage_mw) as avg, MAX(outage_mw) as max FROM fct_nuclear_outages").fetchone()
+            return {
+                "total_records": row["total"],
+                "avg_outage_mw": round(row["avg"], 2) if row["avg"] else 0.0,
+                "max_outage_mw": row["max"] if row["max"] else 0.0
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
