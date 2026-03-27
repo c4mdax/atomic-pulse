@@ -2,38 +2,31 @@ import pytest
 from fastapi.testclient import TestClient
 from src.api import app
 
-"""
-Purpose: Follow TDD Standards
-"""
 client = TestClient(app)
 
-def test_read_root():
-    """
-    Test if the root's response is ok
-    """
-    response = client.get("/")
+def test_read_data_endpoint():
+    """Test the mandatory /data endpoint"""
+    response = client.get("/data?limit=5")
     assert response.status_code == 200
-    assert response.json() == {"status" : "¡Nuclear Outages API is Online!", "version": "1.0.0"}
+    assert isinstance(response.json(), list)
 
-def test_get_outages_format():
-    """
-    Test if the outages endpoint returns a list with correct parameters
-    """
-    response = client.get("/outages?limit=1")
+def test_data_filters():
+    """Test if filters in /data return valid structures"""
+    response = client.get("/data?min_outage=1000")
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data, list)
     if len(data) > 0:
-        record = data[0]
-        expected_keys = {"id", "date_key", "status_id", "capacity_mw", "outage_mw", "percent_outage"}
-        assert expected_keys.issubset(record.keys())
+        assert data[0]["outage_mw"] >= 1000
 
-def test_get_summary():
-    """
-    Test the analytic endpoint
-    """
-    response = client.get("/outages/summary")
+def test_refresh_endpoint():
+    """Test the mandatory /refresh endpoint"""
+    response = client.post("/refresh")
     assert response.status_code == 200
-    data = response.json()
-    assert "total_records" in data
-    assert "avg_outage_mw" in data
+    assert "status" in response.json()
+    assert response.json()["status"] == "success"
+
+def test_summary_bonus():
+    """Test the summary endpoint used by GUI"""
+    response = client.get("/summary")
+    assert response.status_code == 200
+    assert "total_records" in response.json()
