@@ -1,6 +1,8 @@
 import sqlite3
 import os
 from fastapi import FastAPI, HTTPException, Query, Security, Depends
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.security.api_key import APIKeyHeader
 from typing import List, Optional
 from src.models import OutageRead, OutageSummary
@@ -24,6 +26,7 @@ def get_db_connection():
 
 API_KEY_NAME="X-APi-Key"
 API_KEY = os.getenv("APP_API_KEY", "vegeta>goku123") #fallback
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 async def get_api_key(api_key_header: str = Security(api_key_header)):
     if api_key_header == API_KEY:
@@ -37,7 +40,7 @@ def get_data(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     date: Optional[str] = None,
-    min_outage: Optional[float] = None
+    min_outage: Optional[float] = None,
     api_key: str = Depends(get_api_key)
 ):
     """Returns filtered nuclear outage data with pagination support."""
@@ -108,3 +111,10 @@ def get_summary(api_key: str = Depends(get_api_key)):
             }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def serve_frontend():
+    with open("static/index.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
