@@ -76,7 +76,7 @@ class AtomicPulseGUI(ctk.CTk):
         self.tree.heading("Percent", text="IMPACT %")
         self.tree.pack(expand=True, fill="both")
 
-    def fetch_all_data(self):
+    def fetch_all_data(self, from_sync=False):
         """Fetch metrics from /summary and rows from /data"""
         try:
             summary_res = requests.get("http://127.0.0.1:8000/summary")
@@ -95,8 +95,9 @@ class AtomicPulseGUI(ctk.CTk):
                     return 
                 for row in rows:
                     self.tree.insert("", "end", values=(row["date_key"], row["status_id"], row["outage_mw"], f"{row['percent_outage']}%"))
-                
-                self.status_bar.configure(text="Data successfully loaded from local database.", text_color="#4CAF50")
+
+                if not from_sync:
+                    self.status_bar.configure(text="Data successfully loaded from local database.", text_color="#4CAF50")
 
             elif data_res.status_code == 500:
                 self.status_bar.configure(text="Database not initialized. Please click 'SYNC WITH EIA'.", text_color="#FFB86C")
@@ -113,9 +114,10 @@ class AtomicPulseGUI(ctk.CTk):
             
             if response.status_code == 200:
                 res = response.json()
-                msg = f"✅ {res['message']} ({res['records_processed']} new records)"
+                msg = f"{res['message']} ({res['records_processed']} new records)"
                 self.status_bar.configure(text=msg, text_color="#4CAF50")
-                self.fetch_all_data()
+                
+                self.fetch_all_data(from_sync=True)
             else:
                 self.status_bar.configure(text="Sync failed at API level.", text_color="#F44336")
         except:
