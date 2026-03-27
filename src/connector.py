@@ -103,7 +103,7 @@ class EIAConnector:
             except Exception as e:
                 logger.error(f"Graceful shutdown: Error during fetch at offset {offset}: {e}")
                 if offset == 0:
-                    raise ValueError(f"EIA API Authentication or Connection Error: {e}")
+                    raise ValueError(f"EIA API Authentication or Connection Error. Check your EIA API key or authentication. \n Error: {e}")
                 break
         if not all_data:
             logger.info("No new data from the API. System is up to date.")
