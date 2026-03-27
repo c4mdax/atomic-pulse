@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException, Query
 from typing import List, Optional
 from src.models import OutageRead, OutageSummary
 from src.connector import EIAConnector
+from src.db_builder import DatabaseBuilder
 
 app = FastAPI(title="Nuclear Outages API", description="Nuclear Outages Data Access Layer")
 
@@ -50,7 +51,8 @@ def get_data(
 @app.post("/refresh")
 def refresh_data():
     """
-    Extracts new data from EIA API, appends to local parquet storagee and updates the SQLite database
+    Extracts new data from EIA API, appends to local parquet storage 
+    and triggers the DatabaseBuilder to update the SQLite Star Schema.
     """
     try:
         connector = EIAConnector()
@@ -59,8 +61,9 @@ def refresh_data():
         
         if raw_df is not None and not raw_df.empty:
             connector.save_to_parquet(raw_df)
-            with sqlite3.connect(DB_PATH) as conn:
-                raw_df.to_sql("fct_nuclear_outages", conn, if_exists="append", index=False)
+            
+            builder = DatabaseBuilder()
+            builder.build_database()
             
             return {
                 "status": "success", 
