@@ -1,10 +1,14 @@
 import sqlite3
 import os
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Security, Depends
+from fastapi.security.api_key import APIKeyHeader
 from typing import List, Optional
 from src.models import OutageRead, OutageSummary
 from src.connector import EIAConnector
 from src.db_builder import DatabaseBuilder
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI(title="Nuclear Outages API", description="Nuclear Outages Data Access Layer")
 
