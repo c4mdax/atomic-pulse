@@ -22,6 +22,15 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row #access rows by name
     return conn
 
+API_KEY_NAME="X-APi-Key"
+API_KEY = os.getenv("APP_API_KEY", "vegeta>goku123") #fallback
+
+async def get_api_key(api_key_header: str = Security(api_key_header)):
+    if api_key_header == API_KEY:
+        return api_key_header
+    raise HTTPException(
+        status_code=403, detail="Access denied, invalid or not found API Key" 
+    )
 
 @app.get("/data", response_model=List[OutageRead])
 def get_data(
@@ -29,6 +38,7 @@ def get_data(
     offset: int = Query(0, ge=0),
     date: Optional[str] = None,
     min_outage: Optional[float] = None
+    api_key: str = Depends(get_api_key)
 ):
     """Returns filtered nuclear outage data with pagination support."""
     try:
@@ -53,7 +63,7 @@ def get_data(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @app.post("/refresh")
-def refresh_data():
+def refresh_data(api_key: str = Depends(get_api_key)):
     """
     Extracts new data from EIA API, appends to local parquet storage 
     and triggers the DatabaseBuilder to update the SQLite Star Schema.
@@ -86,7 +96,7 @@ def refresh_data():
         raise HTTPException(status_code=500, detail=f"Pipeline failed: {str(e)}")
     
 @app.get("/summary", response_model=OutageSummary)
-def get_summary():
+def get_summary(api_key: str = Depends(get_api_key)):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
