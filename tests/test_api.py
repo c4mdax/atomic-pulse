@@ -4,15 +4,16 @@ from src.api import app
 
 client = TestClient(app)
 
+HEADERS = {"X-API-Key": "vegeta>goku123"}
 def test_read_data_endpoint():
     """Test the mandatory /data endpoint"""
-    response = client.get("/data?limit=5")
+    response = client.get("/data?limit=5", headers=HEADERS)
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
 def test_data_filters():
     """Test if filters in /data return valid structures"""
-    response = client.get("/data?min_outage=1000")
+    response = client.get("/data?min_outage=1000", headers=HEADERS)
     assert response.status_code == 200
     data = response.json()
     if len(data) > 0:
@@ -20,13 +21,13 @@ def test_data_filters():
 
 def test_refresh_endpoint():
     """Test the mandatory /refresh endpoint"""
-    response = client.post("/refresh")
+    response = client.post("/refresh", headers=HEADERS)
     assert response.status_code == 200
     assert "status" in response.json()
     assert response.json()["status"] == "success"
 
 def test_summary_bonus():
     """Test the summary endpoint used by GUI"""
-    response = client.get("/summary")
+    response = client.get("/summary", headers=HEADERS)
     assert response.status_code == 200
     assert "total_records" in response.json()
