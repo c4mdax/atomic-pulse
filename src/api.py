@@ -1,5 +1,5 @@
 import sqlite3
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from typing import List
 from src.models import OutageRead, OutageSummary
 import os
@@ -46,31 +46,22 @@ def get_data(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-
-@app.get("/outages/summary", response_model=OutageSummary)
-def get_outage_summary():
+@app.post("/refresh")
+def refresh_data():
+    """Triggers the data pipeline: EIA API -> Parquet -> Database."""
     try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            query = """
-                SELECT 
-                    COUNT(*) as total_records, 
-                    AVG(outage_mw) as avg_outage, 
-                    MAX(outage_mw) as max_outage 
-                FROM fct_nuclear_outages
-            """
-            row = cursor.execute(query).fetchone()
-            agv_val = row["avg_outage"] if row["avg_outage"] is not None else 0.0
-            max_val = row["max_outage"] if row["max_outage"] is not None else 0.0
-            
-            if not row or row["total_records"] == 0:
-                return {"total_records":0, "avg_outage_mw": 0.0, "max_outage_mw":0.0}
-            
+        connector = EIAConnector()
+        last_date = connector.get_latest_date()
+        raw_df = connector.fetch_nuclear_outages(start_date=last_date)
+        
+        if raw_df is not None and not raw_df.empty:
+            connector.save_to_parquet(raw_df)
             return {
-                "total_records": row["total_records"],
-                "avg_outage_mw": round(row["avg_outage"], 2),
-                "max_outage_mw": row["max_outage"]
+                "status": "success", 
+                "message": "Data synchronized successfully", 
+                "records_processed": len(raw_df)
             }
+        
+        return {"status": "success", "message": "No new data found", "records_processed": 0}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
+        raise HTTPException(status_code=500, detail=f"Pipeline failed: {str(e)}")
