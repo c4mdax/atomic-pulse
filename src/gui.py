@@ -88,11 +88,18 @@ class AtomicPulseGUI(ctk.CTk):
 
             data_res = requests.get("http://127.0.0.1:8000/data?limit=50")
             if data_res.status_code == 200:
+                rows = data_res.json()
                 for i in self.tree.get_children(): self.tree.delete(i)
-                for row in data_res.json():
+                if not rows:
+                    self.status_bar.configure(text="No data found in database. Please click 'SYNC WITH EIA'.", text_color = "#FFB86C")
+                    return 
+                for row in rows:
                     self.tree.insert("", "end", values=(row["date_key"], row["status_id"], row["outage_mw"], f"{row['percent_outage']}%"))
                 
                 self.status_bar.configure(text="Data successfully loaded from local database.", text_color="#4CAF50")
+
+            elif data_res.status_code == 500:
+                self.status_bar.configure(text="Database not initialized. Please click 'SYNC WITH EIA'.", text_color="#FFB86C")
         except:
             self.status_bar.configure(text="Connection Error: Is the FastAPI server running?", text_color="#F44336")
 
