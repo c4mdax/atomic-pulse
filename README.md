@@ -90,25 +90,27 @@ ___
 ## 🔘 Result examples
 ### Without GUI
 - **/data endpoint**:
-```bash
+```json
 id	1
-date_key	"2026-03-26"
-status_id	3
-capacity_mw	100013.2
-outage_mw	19738.455
-percent_outage	19.74
+"date_key":	"2026-03-26",
+"status_id":	3,
+"capacity_mw":	100013.2,
+"outage_mw":	19738.455,
+"percent_outage":	19.74
 ```
 - **/refresh endpoint**:
-```bash
-status	"success"
-message	"No new data found. Database is up to date."
-records_processed	0 
+```json
+"status":	"success",
+"message":	"No new data found. Database is up to date.",
+"records_processed":	0 
 ```
 - **/summary endpoint**:
-```bash
-total_records	7026
-avg_outage_mw	9788.1
-max_outage_mw	32719.784
+```json
+{
+"total_records":	7026,
+"avg_outage_mw":	9788.1,
+"max_outage_mw":	32719.784
+}
 ```
 ### With GUI
 <img width="1863" height="964" alt="image" src="https://github.com/user-attachments/assets/2bde0d42-d8b4-449f-8a02-14b3dcb04cd7" />
