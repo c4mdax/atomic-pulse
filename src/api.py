@@ -1,3 +1,8 @@
+"""
+API module for the Nuclear Outages Data Pipeline.
+Provides endpoints to access, filter, and refresh nuclear grid outage data.
+"""
+
 import sqlite3
 import os
 from typing import Optional
@@ -19,6 +24,13 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "data", "nuclear_outages.db")
 
 def get_db_connection():
+    """
+    Establishes a read-only connection to the local SQLite database.
+    Returns:
+        sqlite3.Connection: Database connection object configured to return dictionary-like rows.
+    Raises:
+        FileNotFoundError: If the SQLite database file does not exist at DB_PATH.
+    """
     if not os.path.exists(DB_PATH):
         raise FileNotFoundError(f"DB not found in: {DB_PATH}")
     conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
@@ -30,6 +42,15 @@ API_KEY = os.getenv("APP_API_KEY", "vegeta>goku123") #fallback
 api_key_header_obj = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 async def get_api_key(api_key_header: str = Security(api_key_header_obj)):
+    """
+    Validates the provided API key against the environment configuration.
+    Args:
+        api_key_header (str): The APi key passed in the HTTP request headers.
+    Returns:
+        str: The validated API key.
+    Raises:
+        HTTPException: If the API key is invalid or missing (403 Forbidden).
+    """
     if api_key_header == API_KEY:
         return api_key_header
     raise HTTPException(
@@ -45,7 +66,20 @@ def get_data(
     status_id: Optional[int] = None,
     api_key: str = Depends(get_api_key)
 ):
-    """Returns filtered nuclear outage data with pagination support."""
+    """
+    Retrieves filtered and paginated nuclear outage records from the database.
+    Args:
+        limit (int): Maximum number of records to return.
+        offset (int): Number of records to skip.
+        start_date (Optional[str]): Lower bound for the date filter (YYYY-MM-DD).
+        end_date (Optional[str]): Upper bound for the date filter (YYYY-MM-DD).
+        status_id (Optional[int]): Filter by severity level (1: Nominal, 2: Warning, 3: Critical).
+        api_key (str): Security dependency injection.
+    Returns:
+        List[dict]: A list of outage records matching the criteria.
+    Raises:
+        HTTPException: If a database operation fails (500 Internal Server Error).
+    """
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -73,8 +107,13 @@ def get_data(
 @app.post("/refresh")
 def refresh_data(api_key: str = Depends(get_api_key)):
     """
-    Extracts new data from EIA API, appends to local parquet storage 
-    and triggers the DatabaseBuilder to update the SQLite Star Schema.
+    Triggers the ETL pipeline to fetch new data from the EIA API and rebuilds the local database.
+    Args:
+        api_key (str): Security dependency injection.
+    Returns:
+        dict: A status report detailing the synchronization outcome and records processed.
+    Raises:
+        HTTPException: If the extraction, transformation, or loading process fails (500).
     """
     try:
         connector = EIAConnector()
@@ -105,6 +144,15 @@ def refresh_data(api_key: str = Depends(get_api_key)):
     
 @app.get("/summary", response_model=OutageSummary)
 def get_summary(api_key: str = Depends(get_api_key)):
+    """
+    Provides aggregated metrics (total count, average, maximum) for the stored outsge data.
+    Args:
+        api_key (str): Security dependency injection.
+    Returns:
+        dict: Summary statistics including total_records, avg_outage_mw, and max_outage_mw.
+    Raises:
+        HTTPException: If a database operation fails (500).
+    """
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -121,5 +169,10 @@ def get_summary(api_key: str = Depends(get_api_key)):
 app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def serve_frontend():
+    """
+    Serves the main frontend interface (index.html).
+    Returns:
+        HTMLResponse: The HTML content of the dashboard.
+    """
     with open("static/index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
