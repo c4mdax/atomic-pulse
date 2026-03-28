@@ -78,3 +78,28 @@ ___
 - [x] Web application interface (`static/index.html`)
 - [x] Cloud deployment
 ___
+## Extra: API Quick Start (cURL)
+You can test the live endpoints directly from your terminal.
+
+*Note: Replace `YOUR_API_KEY` with `vegeta>goku123`.*
+
+*Note: The server needs to be running in order to test the endpoints.*
+#### 1. https://atomic-pulse.onrender.com/summary -> Get global summary
+```bash
+curl --location 'https://atomic-pulse.onrender.com/summary' \
+--header 'X-API-Key: vegeta>goku123'
+```
+
+#### 2. https://atomic-pulse.onrender.com/data -> Get data from the DB
+```bash
+curl --location 'https://atomic-pulse.onrender.com/data' \
+--header 'X-API-Key: vegeta>goku123'
+```
+
+#### 3. https://atomic-pulse.onrender.com/refresh -> Refresh the DB from the EIA API
+```bash
+curl -X POST "https://atomic-pulse.onrender.com/refresh" \
+     -H "X-API-Key: vegeta>goku123" \
+     -H "Content-Type: application/json"
+```
+
