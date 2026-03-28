@@ -63,6 +63,7 @@ git clone https://github.com/c4mdax/nuclear-data-pipeline.git
 cd nuclear-data-pipeline
 python -m venv venvNuclear
 source venvNuclear/bin/activate
+pip install -r requirements.txt
 ```
 
 ### 3. Environment Variables
