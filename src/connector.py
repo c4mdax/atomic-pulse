@@ -1,3 +1,8 @@
+"""
+Data connector module for the US Energy Information Administration (EIA) API.
+Handles data extraction, pagination, retries, and incremental loading for nuclear outages.
+"""
+
 import os
 import requests
 import pandas as pd
@@ -14,13 +19,16 @@ load_dotenv()
 
 class EIAConnector:
     """
-    Handles data extraction from the US Energy Information Adminstration (EIA) API.
-    Focuses on Nuclear Outgaes datasets to power the AtomicPulse pipeline.
+    Client for extracting nuclear outage datasets from the EIA API.
     """
 
     def __init__(self):
         """
-        Initializes the connector using the EIA_API_KEY from env variables.
+        Initializes the EIA connector.
+        Configures the API key from environment variables, sets up the endpoint URL,
+        and establishes an HTTP session with robust retry policies for transient errors.
+        raises:
+            ValueError: If the EIA_API_KEY environment variable is not set.
         """
         self.api_key = os.getenv("EIA_API_KEY")
         self.base_url = "https://api.eia.gov/v2/nuclear-outages/us-nuclear-outages/data/"
@@ -40,8 +48,10 @@ class EIAConnector:
         
     def get_latest_date(self):
         """
-        Reads the existing parquet file to find the most recent extraction date.
-        Returns a string 'YYYY-MM-DD' or None if full load is required.
+        Retrieves the most recent extraction date from the local parquet storage.
+        Used to determine the starting point for incremental data loads.
+        Returns:
+            str | None: The next date to fetch in 'YYYY-MM-DD' format,  or None if no existing data is found.
         """
         if os.path.exists(self.file_path):
             try:
@@ -59,10 +69,15 @@ class EIAConnector:
         
     def fetch_nuclear_outages(self, start_date=None):
         """
-        Queries the EIA API for the latest nuclear plant outage data.
+        Fetches nuclear outage data from the EIA API.
+        Handles pagination automatically and applies optional date filters for incremental updates.
+        Validates the response structure against required schema fields.
+        Args:
+            start_date (str, optional): The starting date for data extraction ('YYYY-MM-DD'). Defaults to None.
         Returns:
-           pd.DataFrame: Cleaned DataFrame containing outage events.
-           or None if the request failed.
+            pd.DataFrame | None: A DataFrame containing the extracted data, or None if extraction/validation fails.
+        Raises:
+            ValueError: If a fatal API authentication or connection error occurs on the first request.
         """
         all_data = []
         offset = 0
@@ -121,10 +136,11 @@ class EIAConnector:
     
     def save_to_parquet(self, df_new):
         """
-        Exports the DF to a compressed parquet file, using pyarrow.
-        Args:
-           df (pd.Dataframe): The data to be stored
-           filename(str): Target path for the .parquet file.
+        Saves the extracted DataFrame to a compressed Parquet file.
+        If the file already exists, it appends the new data, drops duplicates based on the 'period',
+        and sorts the dataset in descending order before overwriting
+        Args
+            df_new (pd.DataFrame): The new dataset to be stored.
         """
         if df_new is None or df_new.empty:
             logger.info("No new data to save.")
