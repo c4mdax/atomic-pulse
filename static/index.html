@@ -15,7 +15,7 @@
             --text-muted: #86868b;
             --border: rgba(255, 255, 255, 0.1);
             
-            /* Status Colors (Muted for elegance) */
+            /* Status Colors */
             --status-1: #32d74b; /* Green */
             --status-2: #ffd60a; /* Gold */
             --status-3: #ff453a; /* Red */
@@ -79,6 +79,7 @@
 
         .btn:hover { background: var(--text-main); color: var(--bg-color); border-color: var(--text-main); }
         .btn-primary { background: var(--text-main); color: var(--bg-color); }
+        .btn-secondary { padding: 8px 16px; font-size: 11px; border-radius: 4px; }
         .btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
         /* --- Metric Grid --- */
@@ -110,8 +111,28 @@
             gap: 40px;
         }
 
-        /* --- Modern Table --- */
-        .table-wrapper { width: 100%; }
+        /* --- Modern Table & Filters --- */
+        .table-wrapper { width: 100%; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--card-bg); }
+        
+        .filter-bar {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .filter-input {
+            background: var(--bg-color);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            padding: 8px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color-scheme: dark;
+        }
 
         table { width: 100%; border-collapse: collapse; }
         
@@ -129,16 +150,8 @@
         td { padding: 20px 16px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.03); font-family: 'JetBrains Mono', monospace; }
         tr:hover td { background: rgba(255,255,255,0.02); }
 
-        /* Severity Badges (Understated) */
-        .status-dot {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            font-weight: 600;
-            font-size: 12px;
-            letter-spacing: 0.5px;
-        }
-
+        /* Severity Badges */
+        .status-dot { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 12px; letter-spacing: 0.5px; }
         .dot { width: 8px; height: 8px; border-radius: 50%; }
         .dot-1 { background: var(--status-1); box-shadow: 0 0 10px var(--status-1); }
         .dot-2 { background: var(--status-2); box-shadow: 0 0 10px var(--status-2); }
@@ -200,6 +213,20 @@
 
     <div class="content-grid">
         <div class="table-wrapper">
+            <div class="filter-bar">
+                <span style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Filters:</span>
+                <input type="date" id="filter-start" class="filter-input" title="Start Date">
+                <input type="date" id="filter-end" class="filter-input" title="End Date">
+                <select id="filter-status" class="filter-input" style="font-family: 'Inter';">
+                    <option value="">All Severities</option>
+                    <option value="3">Critical Only</option>
+                    <option value="2">Warning Only</option>
+                    <option value="1">Nominal Only</option>
+                </select>
+                <button class="btn btn-secondary" onclick="loadData()">Apply</button>
+                <button class="btn btn-secondary" onclick="clearFilters()" style="background:transparent; border-color:transparent; color:var(--text-muted);">Clear</button>
+            </div>
+
             <table>
                 <thead>
                     <tr>
@@ -210,7 +237,7 @@
                     </tr>
                 </thead>
                 <tbody id="table-body">
-                    <tr><td colspan="4" style="text-align:center; padding: 100px; color:var(--text-muted);">Uplink required.</td></tr>
+                    <tr><td colspan="4" style="text-align:center; padding: 100px; color:var(--text-muted);">Uplink required. Initiate data retrieval.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -252,10 +279,30 @@
         statusText.style.color = type === 'error' ? 'var(--status-3)' : (type === 'success' ? 'var(--status-1)' : 'var(--text-muted)');
     }
 
+    function clearFilters() {
+        document.getElementById('filter-start').value = "";
+        document.getElementById('filter-end').value = "";
+        document.getElementById('filter-status').value = "";
+        loadData();
+    }
+
     async function loadData() {
         toggleLoader(true);
         setStatus("executing_query...", "");
+        const tbody = document.getElementById('table-body');
+
+        // Capture filter values
+        const start = document.getElementById('filter-start').value;
+        const end = document.getElementById('filter-end').value;
+        const status = document.getElementById('filter-status').value;
+        
+        let queryParams = '?limit=100'; // Traemos hasta 100 registros para ver bien los filtros
+        if (start) queryParams += `&start_date=${start}`;
+        if (end) queryParams += `&end_date=${end}`;
+        if (status) queryParams += `&status_id=${status}`;
+
         try {
+            // Metrics Summary (Global stats)
             const sumRes = await fetch('/summary', { headers });
             if (sumRes.ok) {
                 const sum = await sumRes.json();
@@ -264,12 +311,23 @@
                 document.getElementById('val-max').innerHTML = `${sum.max_outage_mw.toLocaleString()}<span class="unit">MW</span>`;
             }
 
-            const dataRes = await fetch('/data?limit=50', { headers });
-            if (dataRes.status === 500) { setStatus("database_null", "error"); return; }
+            // Main Data Fetch (Filtered)
+            const dataRes = await fetch(`/data${queryParams}`, { headers });
+            
+            if (dataRes.status === 500) { 
+                setStatus("archive_not_found // run sync", "error"); 
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 60px; color:var(--status-3);">UNINITIALIZED: Synchronize to create local archive.</td></tr>';
+                return; 
+            }
             
             const rows = await dataRes.json();
-            const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
+
+            if (rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 60px; color:var(--text-muted);">ARCHIVE_EMPTY: No records found for selected filters.</td></tr>';
+                setStatus("ready // waiting for sync or new filters", "success");
+                return;
+            }
 
             rows.forEach(row => {
                 const tr = document.createElement('tr');
@@ -284,9 +342,9 @@
                 `;
                 tbody.appendChild(tr);
             });
-            setStatus("query_successful", "success");
+            setStatus("query_successful // uplink stable", "success");
         } catch (e) {
-            setStatus("connection_failure", "error");
+            setStatus("connection_failure // api_offline", "error");
         } finally { toggleLoader(false); }
     }
 
@@ -294,12 +352,18 @@
         const btn = document.getElementById('btn-sync');
         btn.disabled = true; toggleLoader(true);
         setStatus("synchronizing_uplink...", "");
+        
         try {
             const res = await fetch('/refresh', { method: 'POST', headers });
             const result = await res.json();
+            
             if (res.ok) {
-                setStatus(`sync_complete // ${result.records_processed}_units`, "success");
-                loadData();
+                if (result.records_processed === 0) {
+                    setStatus("uplink_idle // data already synchronized", "success");
+                } else {
+                    setStatus(`sync_complete // ${result.records_processed}_units_added`, "success");
+                    loadData();
+                }
             } else { setStatus("access_denied", "error"); }
         } catch (e) { setStatus("fatal_error", "error"); }
         finally { btn.disabled = false; toggleLoader(false); }
