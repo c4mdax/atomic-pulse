@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from typing import Optional
 from fastapi import FastAPI, HTTPException, Query, Security, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -26,9 +27,9 @@ def get_db_connection():
 
 API_KEY_NAME="X-APi-Key"
 API_KEY = os.getenv("APP_API_KEY", "vegeta>goku123") #fallback
-api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+api_key_header_obj = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
-async def get_api_key(api_key_header: str = Security(api_key_header)):
+async def get_api_key(api_key_header: str = Security(api_key_header_obj)):
     if api_key_header == API_KEY:
         return api_key_header
     raise HTTPException(
@@ -39,8 +40,9 @@ async def get_api_key(api_key_header: str = Security(api_key_header)):
 def get_data(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    date: Optional[str] = None,
-    min_outage: Optional[float] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    status_id: Optional[int] = None,
     api_key: str = Depends(get_api_key)
 ):
     """Returns filtered nuclear outage data with pagination support."""
@@ -50,12 +52,15 @@ def get_data(
             query = "SELECT * FROM fct_nuclear_outages WHERE 1=1"
             params = []
 
-            if date:
-                query += " AND date_key = ?"
-                params.append(date)
-            if min_outage:
-                query += " AND outage_mw >= ?"
-                params.append(min_outage)
+            if start_date:
+                query += " AND date_key >= ?"
+                params.append(start_date)
+            if end_date:
+                query += " AND date_key <= ?"
+                params.append(end_date)
+            if status_id:
+                query += " AND status_id = ?"
+                params.append(status_id)
 
             query += " ORDER BY date_key DESC LIMIT ? OFFSET ?"
             params.extend([limit, offset])
@@ -64,7 +69,7 @@ def get_data(
             return [dict(row) for row in rows]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
+    
 @app.post("/refresh")
 def refresh_data(api_key: str = Depends(get_api_key)):
     """
