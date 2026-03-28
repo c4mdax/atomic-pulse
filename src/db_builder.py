@@ -1,3 +1,8 @@
+"""
+Database builder module.
+Transforms flat Parquet files into a relational Star Schema and loads it into a SQLite database.
+"""
+
 import os
 import sqlite3
 import logging
@@ -6,29 +11,44 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class DatabaseBuilder:
+    """
+    Constructs and populates the local SQLite database from Parquet storage.
+    """
+
     def __init__ (self):
+        """
+        Initializes the DatabaseBuilder with default file paths for input and output.
+        """
         self.parquet_path = "data/us_nuclear_outages.parquet"
         self.db_path = "data/nuclear_outages.db"
 
     def build_database(self):
         """
-        Transforms the flat Parquet file into a Star Schema and saves it to SQLite
+        Executes the ETL process to generate the Star Schema.
+
+        Reads the raw Parquet file, cleans and formats data types, and normalizes the data
+        into two dimension tables (dim_status_thresholds, dim_date) and one fact table 
+        (fct_nuclear_outages). Recreates the SQLite tables enforcing foreign key constraints 
+        and inserts the processed records.
+
+        Returns:
+            None
         """
         if not os.path.exists(self.parquet_path):
             logger.error(f"Source file not found: {self.parquet_path}. Run connector.py first")
             return
 
+
         logger.info("Reading raw Parquet data...")
         df_raw = pd.read_parquet(self.parquet_path)
 
+        #Type casting and data cleaning
         df_raw['period'] = pd.to_datetime(df_raw['period'])
         df_raw['outage'] = pd.to_numeric(df_raw['outage'], errors='coerce').fillna(0)
         df_raw['capacity'] = pd.to_numeric(df_raw['capacity'], errors='coerce').fillna(0)
         df_raw['percentOutage'] = pd.to_numeric(df_raw['percentOutage'], errors='coerce').fillna(0)
 
-        """
-        Building dim_stastus_thresholds
-        """
+        #-- Dimension: dim_stauts_thresholds --#
         logger.info("Building dimension: dim_status_thresholds...")
         status_data = [
             {'status_id': 1, 'label': 'Normal', 'min_percent': 0.0, 'max_percent': 5.0},
@@ -37,9 +57,7 @@ class DatabaseBuilder:
         ]
         dim_status = pd.DataFrame(status_data)
 
-        """
-        Building dim_date
-        """
+        #-- Dimension: dim_date --#
         logger.info("Building dimension: dim_date...")
         unique_dates = df_raw['period'].drop_duplicates().sort_values().reset_index(drop=True)
         dim_date = pd.DataFrame({'date_key': unique_dates})
@@ -48,14 +66,13 @@ class DatabaseBuilder:
         dim_date['day_name'] = dim_date['date_key'].dt.day_name()
         dim_date['date_key'] = dim_date['date_key'].dt.strftime('%Y-%m-%d')
 
-        """
-        Building fct_nuclear_outages
-        """
+        #-- Fact table: fct_nuclear_outages --#
         logger.info("Building fact table: fct_nuclear_outages...")
         fct_outages = df_raw.copy()
         fct_outages['date_key'] = fct_outages['period'].dt.strftime('%Y-%m-%d')
 
         def assign_status(pct):
+            """Maps outage percentage to a severity status ID."""
             if pct < 5.0: return 1
             elif pct < 15.0 : return 2
             else: return 3
@@ -65,21 +82,8 @@ class DatabaseBuilder:
         fct_outages.rename(columns={'capacity': 'capacity_mw', 'outage': 'outage_mw', 'percentOutage': 'percent_outage'}, inplace=True)
         fct_outages.reset_index(names='id', inplace=True)
 
-
-        """
-        Saving in SQLite
-        """
-        # logger.info(f"Saving Star Schema to SQLite database at {self.db_path}...")
-        # os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-
-        # # Context manager to close connection
-        # with sqlite3.connect(self.db_path) as conn:
-        # #if_exists='replace' 
-        #     dim_status.to_sql('dim_status_thresholds', conn, if_exists='replace', index=False)
-        #     dim_date.to_sql('dim_date', conn, if_exists='replace', index=False)
-        #     fct_outages.to_sql('fct_nuclear_outages', conn, if_exists='replace', index=False)
-        
-
+        #-- SQLite DB construction --#
+        logger.info("Rebuilding SQLite schema and inserting data...")
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             #foreign keys on
