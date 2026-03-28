@@ -1,5 +1,5 @@
 # AtomicPulse: US Nuclear Outages Data Pipeline
-
+URL: https://atomic-pulse.onrender.com/
 ## Overview
 An end-to-end data engineering pipeline that extracts daily nuclear power outage data from the EIA Open Data API, processes it into a dimensional model, and serves it via a RESTful API and a lightweight frontend interface.
 ___
@@ -68,7 +68,8 @@ uvicorn src.api:app --host 0.0.0.0 --port 8000
 Navigate to `http://localhost:8000/`
 ___
 ## Cloud Deployment
-- **Live URL:**
+The application is hosted on a Render free instance. If the service is idle, it might take ~1 min to spin up on the first request."
+- **Live URL:** https://atomic-pulse.onrender.com/
 ___
 ## Deliverables Checklist
 - [x] Connector script (`src/connector.py`)
