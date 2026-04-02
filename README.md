@@ -4,7 +4,7 @@ URL: https://atomic-pulse.onrender.com/
 An end-to-end data engineering pipeline that extracts daily nuclear power outage data from the EIA Open Data API, processes it into a dimensional model, and serves it via a RESTful API and a lightweight frontend interface.
 ___
 ## 🔘 Architecture & Technical Decisions
-**Extra analysis**: https://c4mdax.github.io/posts/atomic-pulse/
+**Extra analysis**: https://c4mdax.github.io/posts/data-pipeline-ap/
 ### 1. Data Connector
 - **Network Resilience:** Implemented robust HTTP requests using `urllib3`'s `Retry` strategy to gracefully handle transient API errors (502, 503) and rate limits (429).
 - **Incremental Extraction:** The connector reads the latest processed date from local storage and only fetches new records, significantly reducing bandwidth and compute time compared to full historical loads.
